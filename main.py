@@ -1,8 +1,14 @@
-"""AI Tech Knowledge Agent — hoi thoai ve lap trinh, OS, va technology voi long-term memory.
+"""AI Tech Knowledge Agent — Offline Research Library.
 
 Cach dung:
     python main.py chat                    # CLI chat mode
     python main.py chat --voice            # Voice + CLI chat
+    python main.py web                     # Mo web UI (Gradio)
+    python main.py web --port 7861         # Custom port
+    python main.py research "topic"        # Nghien cuu sau
+    python main.py analyze "question"      # Phan tich ky thuat
+    python main.py graph                   # Xem knowledge graph
+    python main.py export                  # Xuat bao cao
     python main.py ingest                  # Index tat ca docs
     python main.py ingest --category python  # Chi index Python docs
     python main.py search "python decorator" # Tim kiem truc tiep
@@ -19,6 +25,15 @@ from agent import sources
 from agent.brain import Brain
 from agent.ingest import ingest_text
 from agent.memory import VectorMemory, StructuredMemory
+from agent.research import ResearchAgent
+from agent.library import Library
+from agent.graph import KnowledgeGraph
+from agent.export import (
+    export_markdown,
+    export_research_history,
+    export_library_report,
+    export_graph_markdown,
+)
 from agent.voice import Listener, Speaker
 
 console = Console()
@@ -40,7 +55,7 @@ def cmd_chat(args):
 
     console.print(Panel(
         "[bold green]AI Tech Knowledge Agent[/]\n"
-        "Hoi bat cu dieu gi ve lap trinh, OS, hay cong nghe!\n"
+        "Offline Research Library\n"
         "Lenh: [cyan]status[/] | [cyan]search <query>[/] | [cyan]save <note>[/] | [cyan]quit[/]",
         title="Ready",
     ))
@@ -87,40 +102,28 @@ def cmd_chat(args):
 
 
 def _display_response(result: dict, speaker: Speaker | None = None):
-    """Hien thi response tu brain."""
     text = result["text"]
     action = result.get("action")
-
     if action:
         _handle_action(action, speaker)
-
     md = Markdown(text)
     console.print(Panel(md, title="[bold cyan]AI Response[/]", border_style="cyan"))
 
 
 def _handle_action(action: dict, speaker: Speaker | None = None):
-    """Xu ly action tu LLM (save note, save snippet, status)."""
     act = action.get("action", "")
-
     if act == "save_note":
-        # Note da duoc LLM generate, hien thi thong bao
         console.print("[green]Da luu note.[/]")
         if speaker:
             speaker.say("Da luu note.")
-
     elif act == "save_snippet":
         console.print("[green]Da luu snippet.[/]")
         if speaker:
             speaker.say("Da luu snippet.")
 
-    elif act == "status":
-        pass
-
 
 def _show_stats(brain: Brain, speaker: Speaker | None = None):
-    """Hien thi thong ke knowledge base."""
     stats = brain.get_stats()
-
     table = Table(title="Knowledge Base Stats")
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="green")
@@ -129,22 +132,18 @@ def _show_stats(brain: Brain, speaker: Speaker | None = None):
     table.add_row("Notes", str(stats["structured"]["notes"]))
     table.add_row("Chat history", str(stats["structured"]["chat_history"]))
     table.add_row("", "")
-
     for cat, count in stats["categories"].items():
         table.add_row(f"  {cat}", str(count))
-
     console.print(table)
     if speaker:
         speaker.say(f"Co {stats['vector_count']} documents trong knowledge base.")
 
 
 def _search(brain: Brain, query: str, speaker: Speaker | None = None):
-    """Tim kiem tu vector store."""
     results = brain.search_knowledge(query, n=5)
     if not results:
         console.print("[yellow]Khong tim thay ket qua.[/]")
         return
-
     table = Table(title=f"Ket qua: {query}")
     table.add_column("#", style="cyan", width=3)
     table.add_column("Source")
@@ -159,13 +158,11 @@ def _search(brain: Brain, query: str, speaker: Speaker | None = None):
             f"{r['distance']:.3f}",
         )
     console.print(table)
-
     if speaker:
         speaker.say(f"Tim thay {len(results)} ket qua cho '{query}'.")
 
 
 def _save_note(struct_mem: StructuredMemory, text: str, speaker: Speaker | None = None):
-    """Luu note tu user."""
     if not text:
         console.print("[yellow]Nhap noi dung note.[/]")
         return
@@ -173,6 +170,124 @@ def _save_note(struct_mem: StructuredMemory, text: str, speaker: Speaker | None 
     console.print(f"[green]Da luu note #{note_id}[/]")
     if speaker:
         speaker.say(f"Da luu note so {note_id}.")
+
+
+def cmd_research(args):
+    """Nghien cuu sau ve 1 chu de."""
+    vector_mem = VectorMemory()
+    struct_mem = StructuredMemory()
+    research = ResearchAgent(vector_mem, struct_mem)
+
+    console.print(f"[cyan]Dang nghien cuu: {args.topic} (do sau: {args.depth})...[/]")
+    report = research.research(args.topic, depth=args.depth)
+
+    body = report.get("body", "")
+    citations = report.get("citations", [])
+
+    md = Markdown(body)
+    console.print(Panel(md, title=f"[bold cyan]Nghien cuu: {args.topic}[/]", border_style="cyan"))
+
+    if citations:
+        console.print("\n[bold]Nguon tham khao:[/]")
+        for c in citations:
+            console.print(f"  [dim]{c}[/]")
+
+    if args.export:
+        filepath = export_markdown(report)
+        console.print(f"\n[green]Da xuat: {filepath}[/]")
+
+
+def cmd_analyze(args):
+    """Phan tich ky thuat."""
+    vector_mem = VectorMemory()
+    struct_mem = StructuredMemory()
+    research = ResearchAgent(vector_mem, struct_mem)
+
+    console.print(f"[cyan]Dang phan tich: {args.question}...[/]")
+    result = research.analyze(args.question)
+
+    body = result.get("body", "")
+    citations = result.get("citations", [])
+
+    md = Markdown(body)
+    console.print(Panel(md, title="[bold cyan]Phan tich ky thuat[/]", border_style="cyan"))
+
+    if citations:
+        console.print("\n[bold]Nguon:[/]")
+        for c in citations:
+            console.print(f"  [dim]{c}[/]")
+
+
+def cmd_graph(args):
+    """Xem knowledge graph."""
+    vector_mem = VectorMemory()
+    graph = KnowledgeGraph(vector_mem)
+
+    if args.topic:
+        related = graph.find_related_topics(args.topic)
+        console.print(f"[bold]Topic lien quan: {args.topic}[/]\n")
+        for r in related:
+            console.print(f"  [cyan]{r['category'].title()}[/] (relevance: {r['relevance']:.2f})")
+            for s in r["sources"][:3]:
+                console.print(f"    [dim]{s}[/]")
+    else:
+        graph_data = graph.build_category_graph()
+        console.print(Panel(
+            f"Nodes: {graph_data['stats']['total_nodes']} | "
+            f"Edges: {graph_data['stats']['total_edges']} | "
+            f"Chunks: {graph_data['stats']['total_chunks']}",
+            title="[bold]Knowledge Graph[/]",
+        ))
+        for node in graph_data["nodes"]:
+            console.print(f"  [cyan]{node['label']}[/] — {node['chunk_count']} chunks, {node['source_count']} sources")
+        if graph_data["edges"]:
+            console.print("\n[bold]Relationships:[/]")
+            for edge in graph_data["edges"]:
+                console.print(f"  {edge['source']} <-> {edge['target']} ({edge['shared_source']})")
+
+        if args.export_md:
+            md_text = graph.export_graph_markdown()
+            filepath = config.DATA_DIR / "exports" / "knowledge_graph.md"
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+            filepath.write_text(md_text, encoding="utf-8")
+            console.print(f"\n[green]Da xuat: {filepath}[/]")
+
+
+def cmd_export(args):
+    """Xuat bao cao."""
+    from agent import config
+
+    vector_mem = VectorMemory()
+    struct_mem = StructuredMemory()
+    library = Library(vector_mem, struct_mem)
+
+    console.print("[cyan]Dang xuat bao cao...[/]")
+
+    if args.what == "all":
+        fp1 = export_research_history(struct_mem)
+        fp2 = export_library_report(library)
+        console.print(f"[green]Lich su nghien cuu: {fp1}[/]")
+        console.print(f"[green]Bao cao library: {fp2}[/]")
+    elif args.what == "research":
+        fp = export_research_history(struct_mem)
+        console.print(f"[green]{fp}[/]")
+    elif args.what == "library":
+        fp = export_library_report(library)
+        console.print(f"[green]{fp}[/]")
+    elif args.what == "graph":
+        graph = KnowledgeGraph(vector_mem)
+        md_text = graph.export_graph_markdown()
+        filepath = config.DATA_DIR / "exports" / "knowledge_graph.md"
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        filepath.write_text(md_text, encoding="utf-8")
+        console.print(f"[green]{filepath}[/]")
+
+
+def cmd_web(args):
+    """Mo web UI."""
+    from agent.ui import launch_ui
+    console.print(f"[cyan]Dang khoi chay Web UI tai http://{args.host}:{args.port}[/]")
+    launch_ui(host=args.host, port=args.port, share=args.share)
 
 
 def cmd_ingest(args):
@@ -239,16 +354,56 @@ def cmd_stats(args):
 
 
 def build_parser():
-    p = argparse.ArgumentParser(description="AI Tech Knowledge Agent")
+    p = argparse.ArgumentParser(
+        description="AI Tech Knowledge Agent — Offline Research Library",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Commands:
+  chat      Chat voi agent (CLI)
+  web       Mo web UI (Gradio)
+  research  Nghien cuu sau ve 1 chu de
+  analyze   Phan tich ky thuat
+  graph     Xem knowledge graph
+  export    Xuat bao cao
+  ingest    Index docs vao knowledge base
+  search    Tim kiem truc tiep
+  stats     Xem thong ke
+""",
+    )
     sub = p.add_subparsers(dest="command")
 
     c = sub.add_parser("chat", help="Chat voi agent")
     c.add_argument("--voice", action="store_true", help="Bat voice mode")
-    c.add_argument("--shallow", action="store_true", help="Tra loi ngan (khong deep)")
+    c.add_argument("--shallow", action="store_true", help="Tra loi ngan")
     c.set_defaults(func=cmd_chat)
 
+    w = sub.add_parser("web", help="Mo web UI")
+    w.add_argument("--host", default="127.0.0.1", help="Host (default: 127.0.0.1)")
+    w.add_argument("--port", type=int, default=7860, help="Port (default: 7860)")
+    w.add_argument("--share", action="store_true", help="Share link")
+    w.set_defaults(func=cmd_web)
+
+    r = sub.add_parser("research", help="Nghien cuu sau")
+    r.add_argument("topic", help="Chu de nghien cuu")
+    r.add_argument("--depth", choices=["quick", "full", "deep"], default="full")
+    r.add_argument("--export", action="store_true", help="Xuat thanh markdown")
+    r.set_defaults(func=cmd_research)
+
+    a = sub.add_parser("analyze", help="Phan tich ky thuat")
+    a.add_argument("question", help="Cau hoi phan tich")
+    a.set_defaults(func=cmd_analyze)
+
+    g = sub.add_parser("graph", help="Knowledge graph")
+    g.add_argument("--topic", help="Tim topic lien quan")
+    g.add_argument("--export-md", action="store_true", help="Xuat markdown")
+    g.set_defaults(func=cmd_graph)
+
+    e = sub.add_parser("export", help="Xuat bao cao")
+    e.add_argument("what", choices=["all", "research", "library", "graph"], default="all", nargs="?")
+    e.set_defaults(func=cmd_export)
+
     i = sub.add_parser("ingest", help="Index docs vao knowledge base")
-    i.add_argument("--category", default=None, help="Chi index category (python,linux,shell...)")
+    i.add_argument("--category", default=None, help="Chi index category")
     i.add_argument("--url", default=None, help="Tai va index 1 URL")
     i.add_argument("--url-category", default=None, help="Category cho URL")
     i.add_argument("--file", default=None, help="Index 1 file local")

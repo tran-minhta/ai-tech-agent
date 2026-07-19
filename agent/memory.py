@@ -74,6 +74,14 @@ class VectorMemory:
             })
         return output
 
+    def get(self, include: list[str] | None = None, ids: list[str] | None = None) -> dict:
+        kwargs = {}
+        if include:
+            kwargs["include"] = include
+        if ids:
+            kwargs["ids"] = ids
+        return self._collection.get(**kwargs)
+
     def count(self) -> int:
         return self._collection.count()
 
