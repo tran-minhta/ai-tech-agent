@@ -21,8 +21,8 @@ from .graph import KnowledgeGraph
 
 def init_components():
     """Khoi tao tat ca components."""
-    vector_mem = VectorMemory(config.CHROMA_DIR)
-    struct_mem = StructuredMemory(config.DB_PATH)
+    vector_mem = VectorMemory()
+    struct_mem = StructuredMemory()
     brain = Brain(vector_mem)
     research = ResearchAgent(vector_mem, struct_mem)
     library = Library(vector_mem, struct_mem)
@@ -171,7 +171,10 @@ def export_lib_report() -> str:
 
 def export_knowledge_graph() -> str:
     _, _, _, _, _, graph = get_components()
-    filepath = export_graph_markdown(graph)
+    filepath = config.DATA_DIR / "exports" / "knowledge_graph.md"
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    md_text = graph.export_graph_markdown()
+    filepath.write_text(md_text, encoding="utf-8")
     return f"Da xuat knowledge graph!\n{filepath}"
 
 
