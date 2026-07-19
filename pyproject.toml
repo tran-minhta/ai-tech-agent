@@ -1,0 +1,21 @@
+[project]
+name = "ai-tech-agent"
+version = "0.1.0"
+description = "AI Tech Knowledge Agent — hoi thoai ve lap trinh, OS, va technology voi long-term memory"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "ollama>=0.3.0",
+    "rich>=13.0.0",
+    "chromadb>=0.5.0",
+    "sentence-transformers>=3.0.0",
+    "numpy>=1.24.0",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
+    "sounddevice>=0.4.0",
+    "soundfile>=0.12.0",
+    "edge-tts>=6.1.0",
+    "faster-whisper>=1.0.0",
+    "platformdirs>=4.0.0",
+]
