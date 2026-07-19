@@ -29,6 +29,7 @@ def cmd_chat(args):
     vector_mem = VectorMemory()
     struct_mem = StructuredMemory()
     brain = Brain(vector_mem, struct_mem)
+    deep = not args.shallow
 
     speaker = None
     listener = None
@@ -74,7 +75,7 @@ def cmd_chat(args):
                 _save_note(struct_mem, text[5:].strip(), speaker)
                 continue
 
-            result = brain.ask(text)
+            result = brain.ask(text, deep=deep)
             _display_response(result, speaker)
 
         except KeyboardInterrupt:
@@ -243,6 +244,7 @@ def build_parser():
 
     c = sub.add_parser("chat", help="Chat voi agent")
     c.add_argument("--voice", action="store_true", help="Bat voice mode")
+    c.add_argument("--shallow", action="store_true", help="Tra loi ngan (khong deep)")
     c.set_defaults(func=cmd_chat)
 
     i = sub.add_parser("ingest", help="Index docs vao knowledge base")
