@@ -97,12 +97,19 @@ def ingest_git_docs(vector_mem: VectorMemory):
 
 def ingest_local_docs(vector_mem: VectorMemory):
     """Ingest tat ca file trong data/docs/."""
+    from ..ingest import ingest_file as _ingest_file
     docs_dir = config.DOCS_DIR
     if not docs_dir.exists():
         return
-    count = ingest_file(docs_dir, vector_mem)
-    if count:
-        print(f"[source] Local docs: {count} chunks")
+    total = 0
+    for f in docs_dir.rglob("*"):
+        if f.is_file() and f.suffix in (".md", ".txt", ".html", ".htm", ".rst"):
+            n = _ingest_file(f, vector_mem)
+            if n:
+                print(f"  -> {f.name}: {n} chunks")
+            total += n
+    if total:
+        print(f"[source] Local docs: {total} chunks")
 
 
 def ingest_all(vector_mem: VectorMemory, categories: list[str] | None = None):
